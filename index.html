@@ -34,15 +34,16 @@
             </div>
         </header>
 
-        <!-- Loading / Setup State -->
+        <!-- Loading / Diagnostic State -->
         <div id="loading" class="flex flex-col items-center justify-center py-40 px-10 text-center">
             <div id="loading-spinner" class="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
             <p id="loading-text" class="text-sm font-bold text-slate-400">同期中...</p>
+            <div id="diagnostic-msg" class="mt-4 text-[10px] text-slate-400 font-mono"></div>
+            <button id="retry-btn" onclick="location.reload()" class="hidden mt-6 px-6 py-2 bg-slate-200 rounded-full text-xs font-bold text-slate-600">再読み込み</button>
         </div>
 
         <!-- Main Content -->
         <main id="mainContent" class="hidden px-4 pt-6 space-y-8">
-            <!-- Navigation -->
             <div class="flex bg-slate-200/50 p-1 rounded-2xl">
                 <button onclick="switchTab('input')" id="tab-input" class="flex-1 py-3 text-xs font-black rounded-xl transition-all bg-white shadow-sm text-indigo-600">自分の空き時間</button>
                 <button onclick="switchTab('result')" id="tab-result" class="flex-1 py-3 text-xs font-black rounded-xl transition-all text-slate-500">全員の重なり</button>
@@ -77,9 +78,6 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // ==========================================
-        // 【重要】GitHubで動かすための設定
-        // ==========================================
         const YOUR_FIREBASE_CONFIG = {
             apiKey: "AIzaSyBQMwDV9sP_z6M6SSiK9-fQew2Ct20GIko",
             authDomain: "time-slot-planner.firebaseapp.com",
@@ -89,21 +87,35 @@
             appId: "1:971422980882:web:d5c2e2868792f6b333b1cb"
         };
 
+        const updateStatus = (msg, diag = "") => {
+            document.getElementById('loading-text').innerText = msg;
+            if (diag) document.getElementById('diagnostic-msg').innerText = diag;
+        };
+
         let firebaseConfig;
         const isSandbox = typeof __firebase_config !== 'undefined';
-        
-        if (isSandbox) {
-            firebaseConfig = JSON.parse(__firebase_config);
-        } else {
-            firebaseConfig = YOUR_FIREBASE_CONFIG;
-        }
+        firebaseConfig = isSandbox ? JSON.parse(__firebase_config) : YOUR_FIREBASE_CONFIG;
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
         const appId = isSandbox ? __app_id : 'scheduler-19th-prod';
 
-        const TARGET_DATES = ["2/9(月)", "2/10(火)", "2/12(木)", "2/16(月)"];
+        // ==========================================
+        // 【編集ポイント】ここで日程を変更します
+        // ==========================================
+        const TARGET_DATES = [
+            "2/9(月)", 
+            "2/10(火)", 
+            "2/12(木)", 
+            "2/16(月)", 
+            "2/17(火)", 
+            "2/19(木)", 
+            "2/20(金)", 
+            "2/25(水)", 
+            "2/26(木)"
+        ];
+
         const START_HOUR = 10;
         const END_HOUR = 22;
         const HOURS = Array.from({length: END_HOUR - START_HOUR + 1}, (_, i) => START_HOUR + i);
@@ -112,7 +124,15 @@
         let allResponses = [];
         let currentUser = null;
 
+        const timeout = setTimeout(() => {
+            if (!document.getElementById('loading').classList.contains('hidden')) {
+                updateStatus("接続に時間がかかっています...", "Firebase Consoleの設定を確認してください");
+                document.getElementById('retry-btn').classList.remove('hidden');
+            }
+        }, 15000);
+
         const initAuth = async () => {
+            updateStatus("認証を開始中...");
             try {
                 if (isSandbox && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
@@ -121,13 +141,14 @@
                 }
             } catch (err) {
                 console.error("Auth Error:", err);
-                document.getElementById('loading-text').innerText = "認証エラー。承認済みドメインを確認してください。";
+                updateStatus("認証エラーが発生しました", `Code: ${err.code}`);
             }
         };
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 currentUser = user;
+                updateStatus("データベースに接続中...");
                 startSync();
             }
         });
@@ -135,6 +156,7 @@
         function startSync() {
             const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'responses'));
             onSnapshot(q, (snapshot) => {
+                clearTimeout(timeout);
                 allResponses = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
                 const myData = allResponses.find(r => r.id === currentUser.uid);
                 if (myData) {
@@ -149,7 +171,7 @@
                 renderResultGrid();
             }, (error) => {
                 console.error("Firestore Sync Error:", error);
-                document.getElementById('loading-text').innerText = "同期エラー: " + error.code;
+                updateStatus("同期エラー", `Code: ${error.code}`);
             });
         }
 
@@ -265,5 +287,4 @@
         lucide.createIcons();
     </script>
 </body>
-
 </html>
