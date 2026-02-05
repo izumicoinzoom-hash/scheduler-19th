@@ -11,22 +11,12 @@
         body { font-family: 'Noto Sans JP', sans-serif; -webkit-tap-highlight-color: transparent; }
         .time-segment { transition: all 0.1s; }
         .glass-card { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); }
-        
-        /* スクロールバー非表示 */
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-        @keyframes pulse-soft {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
-        }
-        .loading-pulse { animation: pulse-soft 2s infinite; }
     </style>
 </head>
 <body class="bg-[#F8FAFC] text-slate-900 min-h-screen pb-20">
 
     <div id="app" class="max-w-md mx-auto">
-        <!-- Persistent Header -->
+        <!-- Header -->
         <header class="sticky top-0 z-30 bg-[#F8FAFC]/80 backdrop-blur-md border-b border-slate-200 px-6 py-4">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
@@ -44,16 +34,15 @@
             </div>
         </header>
 
-        <!-- Loading State -->
-        <div id="loading" class="flex flex-col items-center justify-center py-40">
-            <div class="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p class="text-xs font-bold text-slate-400 tracking-widest">同期中...</p>
+        <!-- Loading / Setup State -->
+        <div id="loading" class="flex flex-col items-center justify-center py-40 px-10 text-center">
+            <div id="loading-spinner" class="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p id="loading-text" class="text-sm font-bold text-slate-400">同期中...</p>
         </div>
 
         <!-- Main Content -->
         <main id="mainContent" class="hidden px-4 pt-6 space-y-8">
-            
-            <!-- Navigation Tabs -->
+            <!-- Navigation -->
             <div class="flex bg-slate-200/50 p-1 rounded-2xl">
                 <button onclick="switchTab('input')" id="tab-input" class="flex-1 py-3 text-xs font-black rounded-xl transition-all bg-white shadow-sm text-indigo-600">自分の空き時間</button>
                 <button onclick="switchTab('result')" id="tab-result" class="flex-1 py-3 text-xs font-black rounded-xl transition-all text-slate-500">全員の重なり</button>
@@ -63,61 +52,22 @@
             <section id="view-input" class="space-y-6">
                 <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
                     <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Your Name</label>
-                    <input type="text" id="userName" placeholder="お名前を入力" 
-                        class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 font-bold text-lg outline-none focus:border-indigo-500 focus:bg-white transition-all">
+                    <input type="text" id="userName" placeholder="お名前を入力" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 font-bold text-lg outline-none focus:border-indigo-500 transition-all">
                 </div>
-
-                <div class="space-y-4">
-                    <div class="flex items-center justify-between px-2">
-                        <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Select Availability</h3>
-                        <span class="text-[9px] text-indigo-500 font-bold">タップして時間を塗りつぶす</span>
-                    </div>
-
-                    <div id="inputGrid" class="space-y-3">
-                        <!-- Dates will be injected here -->
-                    </div>
-                </div>
-
-                <button onclick="saveData()" id="saveBtn" 
-                    class="w-full bg-indigo-600 text-white py-5 rounded-3xl font-black text-lg shadow-xl shadow-indigo-200 active:scale-95 transition-transform flex items-center justify-center gap-3">
-                    <span>この内容で保存する</span>
-                    <i data-lucide="send" class="w-5 h-5"></i>
+                <div id="inputGrid" class="space-y-3"></div>
+                <button onclick="saveData()" id="saveBtn" class="w-full bg-indigo-600 text-white py-5 rounded-3xl font-black text-lg shadow-xl shadow-indigo-200 active:scale-95 transition-transform flex items-center justify-center gap-3">
+                    <span>保存する</span><i data-lucide="send" class="w-5 h-5"></i>
                 </button>
             </section>
 
             <!-- VIEW: RESULT -->
             <section id="view-result" class="hidden space-y-6">
-                <!-- Summary Card -->
-                <div class="bg-indigo-600 rounded-[2rem] p-6 text-white shadow-xl shadow-indigo-100 relative overflow-hidden">
-                    <div class="relative z-10 flex items-center justify-between">
-                        <div>
-                            <p class="text-[10px] font-bold opacity-70 uppercase tracking-widest">Total Respondents</p>
-                            <h2 class="text-3xl font-black"><span id="respondentCount">0</span> <span class="text-sm font-medium">名</span></h2>
-                        </div>
-                        <div class="bg-white/20 p-4 rounded-2xl">
-                            <i data-lucide="bar-chart-3" class="w-8 h-8"></i>
-                        </div>
-                    </div>
-                    <div class="mt-4 pt-4 border-t border-white/10 flex -space-x-2" id="facePile">
-                        <!-- Faces injected here -->
-                    </div>
+                <div class="bg-indigo-600 rounded-[2rem] p-6 text-white shadow-xl shadow-indigo-100">
+                    <p class="text-[10px] font-bold opacity-70 uppercase tracking-widest">Total Respondents</p>
+                    <h2 class="text-3xl font-black"><span id="respondentCount">0</span> <span class="text-sm font-medium">名</span></h2>
+                    <div class="mt-4 pt-4 border-t border-white/10 flex -space-x-2" id="facePile"></div>
                 </div>
-
-                <!-- Heatmap Legend -->
-                <div class="flex items-center gap-3 px-2">
-                    <span class="text-[9px] font-black text-slate-400 uppercase">重なり具合:</span>
-                    <div class="flex gap-1">
-                        <div class="w-3 h-3 bg-slate-100 rounded-sm"></div>
-                        <div class="w-3 h-3 bg-indigo-200 rounded-sm"></div>
-                        <div class="w-3 h-3 bg-indigo-400 rounded-sm"></div>
-                        <div class="w-3 h-3 bg-indigo-600 rounded-sm"></div>
-                    </div>
-                    <span class="text-[9px] font-bold text-slate-400">← 少ない / 多い →</span>
-                </div>
-
-                <div id="resultGrid" class="space-y-6">
-                    <!-- Results will be injected here -->
-                </div>
+                <div id="resultGrid" class="space-y-6"></div>
             </section>
         </main>
     </div>
@@ -125,31 +75,55 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const firebaseConfig = JSON.parse(__firebase_config);
+        // ==========================================
+        // 【重要】GitHubで動かすための設定
+        // ==========================================
+        const YOUR_FIREBASE_CONFIG = {
+            apiKey: "AIzaSyBQMwDV9sP_z6M6SSiK9-fQew2Ct20GIko",
+            authDomain: "time-slot-planner.firebaseapp.com",
+            projectId: "time-slot-planner",
+            storageBucket: "time-slot-planner.firebasestorage.app",
+            messagingSenderId: "971422980882",
+            appId: "1:971422980882:web:d5c2e2868792f6b333b1cb"
+        };
+
+        let firebaseConfig;
+        const isSandbox = typeof __firebase_config !== 'undefined';
+        
+        if (isSandbox) {
+            firebaseConfig = JSON.parse(__firebase_config);
+        } else {
+            firebaseConfig = YOUR_FIREBASE_CONFIG;
+        }
+
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'time-granular-scheduler';
+        const appId = isSandbox ? __app_id : 'scheduler-19th-prod';
 
         const TARGET_DATES = ["2/9(月)", "2/10(火)", "2/12(木)", "2/16(月)", "2/17(火)", "2/19(木)", "2/20(金)", "2/25(水)", "2/26(木)"];
         const START_HOUR = 10;
-        const END_HOUR = 22; // 22:00まで
+        const END_HOUR = 22;
         const HOURS = Array.from({length: END_HOUR - START_HOUR + 1}, (_, i) => START_HOUR + i);
 
-        let myAvailability = {}; // { "2/9(月)": [12, 13, 19, 20], ... }
+        let myAvailability = {};
         let allResponses = [];
         let currentUser = null;
 
-        // --- AUTH & SYNC ---
-        async function initAuth() {
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                await signInWithCustomToken(auth, __initial_auth_token);
-            } else {
-                await signInAnonymously(auth);
+        const initAuth = async () => {
+            try {
+                if (isSandbox && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (err) {
+                console.error("Auth Error:", err);
+                document.getElementById('loading-text').innerText = "認証エラー。承認済みドメインを確認してください。";
             }
-        }
+        };
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
@@ -162,70 +136,57 @@
             const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'responses'));
             onSnapshot(q, (snapshot) => {
                 allResponses = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-                
                 const myData = allResponses.find(r => r.id === currentUser.uid);
                 if (myData) {
-                    if (!document.getElementById('userName').value) {
-                        document.getElementById('userName').value = myData.name;
-                    }
+                    if (!document.getElementById('userName').value) document.getElementById('userName').value = myData.name || "";
                     myAvailability = myData.availability || {};
                     document.getElementById('userBadge').classList.remove('hidden');
                     document.getElementById('activeUserName').innerText = myData.name;
                 }
-
                 document.getElementById('loading').classList.add('hidden');
                 document.getElementById('mainContent').classList.remove('hidden');
-                
                 renderInputGrid();
                 renderResultGrid();
+            }, (error) => {
+                console.error("Firestore Sync Error:", error);
+                document.getElementById('loading-text').innerText = "同期エラー: " + error.code;
             });
         }
 
-        // --- UI: INPUT RENDER ---
         window.renderInputGrid = () => {
             const container = document.getElementById('inputGrid');
             container.innerHTML = '';
-
             TARGET_DATES.forEach(date => {
                 const dateData = myAvailability[date] || [];
                 const card = document.createElement('div');
                 card.className = 'bg-white rounded-2xl p-4 border border-slate-100 shadow-sm';
-                
                 card.innerHTML = `
                     <div class="flex items-center justify-between mb-3">
                         <span class="font-black text-slate-800 text-sm">${date}</span>
-                        <div class="flex gap-1">
-                            <button onclick="clearDate('${date}')" class="text-[9px] font-bold text-slate-400 hover:text-rose-500 uppercase tracking-tighter">Clear</button>
-                        </div>
+                        <button onclick="clearDate('${date}')" class="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Clear</button>
                     </div>
                     <div class="relative pt-6 pb-2">
-                        <!-- Hour Labels -->
                         <div class="absolute top-0 left-0 w-full flex justify-between px-1">
                             ${HOURS.filter((h, i) => i % 3 === 0 || h === END_HOUR).map(h => `<span class="text-[8px] font-black text-slate-300">${h}</span>`).join('')}
                         </div>
-                        <!-- Time Bar -->
                         <div class="flex h-10 w-full bg-slate-50 rounded-lg overflow-hidden border border-slate-100 p-1 gap-0.5">
                             ${HOURS.map(h => {
                                 const isActive = dateData.includes(h);
                                 return `<div onclick="toggleTime('${date}', ${h})" 
-                                    class="flex-1 rounded-sm cursor-pointer time-segment ${isActive ? 'bg-indigo-600 shadow-[0_0_8px_rgba(79,70,229,0.4)]' : 'bg-white hover:bg-slate-100 border border-slate-100'}">
+                                    class="flex-1 rounded-sm cursor-pointer time-segment ${isActive ? 'bg-indigo-600 shadow-md' : 'bg-white hover:bg-slate-100'}">
                                 </div>`;
                             }).join('')}
                         </div>
-                    </div>
-                `;
+                    </div>`;
                 container.appendChild(card);
             });
         };
 
         window.toggleTime = (date, hour) => {
             if (!myAvailability[date]) myAvailability[date] = [];
-            const index = myAvailability[date].indexOf(hour);
-            if (index > -1) {
-                myAvailability[date].splice(index, 1);
-            } else {
-                myAvailability[date].push(hour);
-            }
+            const idx = myAvailability[date].indexOf(hour);
+            if (idx > -1) myAvailability[date].splice(idx, 1);
+            else myAvailability[date].push(hour);
             renderInputGrid();
         };
 
@@ -234,105 +195,24 @@
             renderInputGrid();
         };
 
-        // --- UI: RESULT RENDER (Heatmap) ---
-        function renderResultGrid() {
-            const container = document.getElementById('resultGrid');
-            const respondentCount = allResponses.length;
-            document.getElementById('respondentCount').innerText = respondentCount;
-            container.innerHTML = '';
-
-            // Facepile
-            const facePile = document.getElementById('facePile');
-            facePile.innerHTML = allResponses.slice(0, 8).map(r => `
-                <div class="w-8 h-8 rounded-full bg-white border-2 border-indigo-600 flex items-center justify-center text-[10px] font-black text-indigo-600 shadow-sm">
-                    ${r.name.substring(0, 1)}
-                </div>
-            `).join('') + (allResponses.length > 8 ? `<div class="w-8 h-8 rounded-full bg-indigo-400 border-2 border-indigo-600 flex items-center justify-center text-[8px] font-black text-white">+${allResponses.length - 8}</div>` : '');
-
-            TARGET_DATES.forEach(date => {
-                const hourCounts = {};
-                HOURS.forEach(h => hourCounts[h] = 0);
-                
-                allResponses.forEach(r => {
-                    if (r.availability && r.availability[date]) {
-                        r.availability[date].forEach(h => {
-                            if (hourCounts[h] !== undefined) hourCounts[h]++;
-                        });
-                    }
-                });
-
-                const dateCard = document.createElement('div');
-                dateCard.className = 'bg-white rounded-3xl p-5 border border-slate-100 shadow-sm';
-                
-                // 計算：最も重なっている時間帯を見つける
-                const bestHours = Object.keys(hourCounts).filter(h => hourCounts[h] > 0 && hourCounts[h] === Math.max(...Object.values(hourCounts)));
-                const bestLabel = bestHours.length > 0 && Math.max(...Object.values(hourCounts)) > 0 
-                    ? `<span class="bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded text-[9px] font-black uppercase">Best: ${Math.min(...bestHours)}:00〜</span>` 
-                    : '';
-
-                dateCard.innerHTML = `
-                    <div class="flex items-center justify-between mb-4">
-                        <span class="font-black text-slate-800">${date}</span>
-                        ${bestLabel}
-                    </div>
-                    <div class="space-y-4">
-                        <!-- Heatmap Bar -->
-                        <div class="flex h-12 w-full bg-slate-50 rounded-xl overflow-hidden p-1.5 gap-1">
-                            ${HOURS.map(h => {
-                                const count = hourCounts[h];
-                                const ratio = respondentCount > 0 ? count / respondentCount : 0;
-                                let colorClass = 'bg-white';
-                                if (ratio > 0.75) colorClass = 'bg-indigo-600';
-                                else if (ratio > 0.4) colorClass = 'bg-indigo-400';
-                                else if (ratio > 0) colorClass = 'bg-indigo-200';
-
-                                return `<div class="flex-1 rounded-md ${colorClass} transition-colors relative group">
-                                    <div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[8px] px-1.5 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-                                        ${h}:00 (${count}人)
-                                    </div>
-                                </div>`;
-                            }).join('')}
-                        </div>
-                        <!-- Time Axis -->
-                        <div class="flex justify-between px-1">
-                             ${HOURS.filter((h, i) => i % 3 === 0 || h === END_HOUR).map(h => `<span class="text-[9px] font-bold text-slate-300">${h}:00</span>`).join('')}
-                        </div>
-                    </div>
-                `;
-                container.appendChild(dateCard);
-            });
-        }
-
-        // --- DATA ACTION ---
         window.saveData = async () => {
             const name = document.getElementById('userName').value.trim();
             if (!name) return alert("お名前を入力してください");
-            
             const btn = document.getElementById('saveBtn');
             btn.disabled = true;
-            btn.innerHTML = `<span>保存中...</span>`;
-
+            btn.innerText = "保存中...";
             try {
                 await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'responses', currentUser.uid), {
-                    name,
-                    availability: myAvailability,
-                    updatedAt: new Date().toISOString()
+                    name, availability: myAvailability, updatedAt: new Date().toISOString()
                 });
-                
-                btn.classList.replace('bg-indigo-600', 'bg-emerald-500');
-                btn.innerHTML = `<span>保存しました！</span><i data-lucide="check" class="w-5 h-5"></i>`;
-                lucide.createIcons();
-                
+                btn.innerText = "保存しました！";
                 setTimeout(() => {
                     btn.disabled = false;
-                    btn.classList.replace('bg-emerald-500', 'bg-indigo-600');
-                    btn.innerHTML = `<span>この内容で保存する</span><i data-lucide="send" class="w-5 h-5"></i>`;
-                    lucide.createIcons();
+                    btn.innerText = "保存する";
                     switchTab('result');
-                }, 1500);
+                }, 1000);
             } catch (err) {
-                console.error(err);
-                alert("保存に失敗しました");
+                alert("エラー: " + err.message);
                 btn.disabled = false;
             }
         };
@@ -344,7 +224,43 @@
             document.getElementById('tab-result').className = `flex-1 py-3 text-xs font-black rounded-xl transition-all ${tab === 'result' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`;
         };
 
-        // Run
+        function renderResultGrid() {
+            const container = document.getElementById('resultGrid');
+            const respondentCount = allResponses.length;
+            document.getElementById('respondentCount').innerText = respondentCount;
+            container.innerHTML = '';
+
+            const facePile = document.getElementById('facePile');
+            facePile.innerHTML = allResponses.slice(0, 8).map(r => `
+                <div class="w-8 h-8 rounded-full bg-white border-2 border-indigo-600 flex items-center justify-center text-[10px] font-black text-indigo-600 shadow-sm">${r.name ? r.name.substring(0, 1) : '?'}</div>
+            `).join('') + (allResponses.length > 8 ? `<div class="w-8 h-8 rounded-full bg-indigo-400 border-2 border-indigo-600 flex items-center justify-center text-[8px] font-black text-white">+${allResponses.length - 8}</div>` : '');
+
+            TARGET_DATES.forEach(date => {
+                const hourCounts = {};
+                HOURS.forEach(h => hourCounts[h] = 0);
+                allResponses.forEach(r => {
+                    if (r.availability && r.availability[date]) {
+                        r.availability[date].forEach(h => { if (hourCounts[h] !== undefined) hourCounts[h]++; });
+                    }
+                });
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-3xl p-5 border border-slate-100 shadow-sm';
+                card.innerHTML = `
+                    <div class="font-black text-slate-800 mb-4">${date}</div>
+                    <div class="flex h-12 w-full bg-slate-50 rounded-xl overflow-hidden p-1.5 gap-1">
+                        ${HOURS.map(h => {
+                            const ratio = respondentCount > 0 ? hourCounts[h] / respondentCount : 0;
+                            let color = 'bg-white';
+                            if (ratio > 0.7) color = 'bg-indigo-600';
+                            else if (ratio > 0.3) color = 'bg-indigo-300';
+                            else if (ratio > 0) color = 'bg-indigo-100';
+                            return `<div class="flex-1 rounded-md ${color}"></div>`;
+                        }).join('')}
+                    </div>`;
+                container.appendChild(card);
+            });
+        }
+
         initAuth();
         lucide.createIcons();
     </script>
