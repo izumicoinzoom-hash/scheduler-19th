@@ -103,7 +103,7 @@
         const db = getFirestore(app);
         const appId = isSandbox ? __app_id : 'scheduler-19th-prod';
 
-        const TARGET_DATES = ["2/9(月)", "2/10(火)", "2/12(木)", "2/16(月)", "2/17(火)", "2/19(木)", "2/20(金)", "2/25(水)", "2/26(木)"];
+        const TARGET_DATES = ["2/9(月)", "2/10(火)", "2/12(木)", "2/16(月)"];
         const START_HOUR = 10;
         const END_HOUR = 22;
         const HOURS = Array.from({length: END_HOUR - START_HOUR + 1}, (_, i) => START_HOUR + i);
@@ -265,4 +265,5 @@
         lucide.createIcons();
     </script>
 </body>
+
 </html>
