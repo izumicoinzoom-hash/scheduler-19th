@@ -8,12 +8,17 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     
     <script>
-        // Google API初期化用のグローバル関数
+        // Google API初期化用のフラグとコールバック
+        window.gapiReady = false;
+        window.gisReady = false;
+
         window.onGapiLoad = () => {
-            window.dispatchEvent(new Event('gapi-script-loaded'));
+            window.gapiReady = true;
+            if (window.initGapi) window.initGapi();
         };
         window.onGisLoad = () => {
-            window.dispatchEvent(new Event('gis-script-loaded'));
+            window.gisReady = true;
+            if (window.initGis) window.initGis();
         };
     </script>
     <!-- Google Identity Services & API Client -->
@@ -28,9 +33,8 @@
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
         
-        /* Google連携状態のスタイル */
-        .gcal-connected { border-color: #10b981; background-color: #f0fdf4; }
-        .gcal-loading { opacity: 0.5; cursor: wait; }
+        .gcal-connected { border-color: #10b981; background-color: #f0fdf4; color: #059669 !important; }
+        .gcal-waiting { opacity: 0.6; pointer-events: none; }
     </style>
 </head>
 <body class="bg-[#F8FAFC] text-slate-900 min-h-screen pb-20">
@@ -49,10 +53,9 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
-                    <!-- Google Calendar Auth Button -->
-                    <button id="gcal-auth-btn" onclick="handleAuthClick()" class="p-2 bg-white border border-slate-200 rounded-xl shadow-sm hover:bg-slate-50 transition-all active:scale-95 flex items-center gap-2">
+                    <button id="gcal-auth-btn" onclick="handleAuthClick()" class="gcal-waiting p-2 bg-white border border-slate-200 rounded-xl shadow-sm hover:bg-slate-50 transition-all active:scale-95 flex items-center gap-2">
                         <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_48dp.png" class="w-5 h-5" alt="Google Calendar">
-                        <span id="gcal-btn-text" class="text-[10px] font-bold text-slate-500 hidden sm:inline">連携</span>
+                        <span id="gcal-btn-text" class="text-[10px] font-bold text-slate-400">読込中</span>
                     </button>
                     <div id="userBadge" class="hidden px-3 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-bold text-slate-500 shadow-sm">
                         <span id="activeUserName"></span>
@@ -69,7 +72,6 @@
 
         <!-- Main Content -->
         <main id="mainContent" class="hidden px-4 pt-6 space-y-6">
-            <!-- Navigation -->
             <div class="flex bg-slate-200/50 p-1 rounded-2xl overflow-x-auto no-scrollbar">
                 <button onclick="switchTab('config')" id="tab-config" class="flex-none px-4 py-3 text-[10px] font-black rounded-xl transition-all text-slate-500 whitespace-nowrap">候補日の設定</button>
                 <button onclick="switchTab('input')" id="tab-input" class="flex-1 py-3 text-[10px] font-black rounded-xl transition-all bg-white shadow-sm text-indigo-600 whitespace-nowrap">自分の回答</button>
@@ -104,7 +106,6 @@
                         <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Your Name</label>
                         <input type="text" id="userName" placeholder="お名前を入力" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 font-bold text-lg outline-none focus:border-indigo-500 transition-all">
                         <div id="gcal-status" class="mt-3 text-[10px] font-bold text-slate-400 flex items-center gap-1 min-h-[1rem]">
-                            <!-- Status msg -->
                         </div>
                     </div>
                     <div id="inputGrid" class="space-y-3"></div>
@@ -132,7 +133,7 @@
             </section>
         </main>
 
-        <!-- Reset Modal -->
+        <!-- Modal -->
         <div id="confirmModal" class="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm hidden">
             <div class="bg-white rounded-[2.5rem] w-full max-w-xs p-8 shadow-2xl">
                 <div class="w-16 h-16 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
@@ -191,20 +192,23 @@
         const END_HOUR = 22;
         const HOURS = Array.from({length: END_HOUR - START_HOUR + 1}, (_, i) => START_HOUR + i);
 
-        // --- Google API Handlers ---
-        const initGapi = async () => {
+        // --- Google API Logic ---
+        window.initGapi = async () => {
+            if (typeof gapi === 'undefined') return;
             try {
-                await gapi.client.init({
-                    apiKey: GOOGLE_API_KEY,
-                    discoveryDocs: [DISCOVERY_DOC],
+                await gapi.load('client', async () => {
+                    await gapi.client.init({
+                        apiKey: GOOGLE_API_KEY,
+                        discoveryDocs: [DISCOVERY_DOC],
+                    });
+                    gapiInited = true;
+                    checkGoogleReady();
                 });
-                gapiInited = true;
-            } catch (e) {
-                console.error("GAPI Init error:", e);
-            }
+            } catch (e) { console.error("GAPI Init fail", e); }
         };
 
-        const initGis = () => {
+        window.initGis = () => {
+            if (typeof google === 'undefined') return;
             try {
                 tokenClient = google.accounts.oauth2.initTokenClient({
                     client_id: GOOGLE_CLIENT_ID,
@@ -216,14 +220,28 @@
                     },
                 });
                 gisInited = true;
-            } catch (e) {
-                console.error("GIS Init error:", e);
-            }
+                checkGoogleReady();
+            } catch (e) { console.error("GIS Init fail", e); }
         };
+
+        function checkGoogleReady() {
+            if (gapiInited && gisInited) {
+                const btn = document.getElementById('gcal-auth-btn');
+                const btnText = document.getElementById('gcal-btn-text');
+                if (btn) {
+                    btn.classList.remove('gcal-waiting');
+                    btnText.innerText = "連携";
+                    btnText.classList.replace('text-slate-400', 'text-slate-600');
+                }
+            }
+        }
 
         window.handleAuthClick = () => {
             if (!gapiInited || !gisInited) {
-                alert("Google APIを準備中です。少し待ってから再度お試しください。");
+                // 強制再初期化試行
+                window.initGapi();
+                window.initGis();
+                alert("Google APIを準備中です。数秒後にもう一度押してください。");
                 return;
             }
             tokenClient.requestAccessToken({prompt: 'consent'});
@@ -246,10 +264,11 @@
                     lucide.createIcons();
                 }
                 const btn = document.getElementById('gcal-auth-btn');
-                if (btn) btn.classList.add('gcal-connected');
-            } catch (err) {
-                console.error("GCal fetch error:", err);
-            }
+                if (btn) {
+                    btn.classList.add('gcal-connected');
+                    document.getElementById('gcal-btn-text').innerText = "同期中";
+                }
+            } catch (err) { console.error("GCal fetch error:", err); }
         }
 
         // --- Firebase Handlers ---
@@ -260,16 +279,13 @@
                 } else {
                     await signInAnonymously(auth);
                 }
-            } catch (err) {
-                console.error("Auth init failed:", err);
-            }
+            } catch (err) { console.error("Auth init failed:", err); }
         };
 
         onAuthStateChanged(auth, (user) => {
             currentUser = user;
-            if (user) {
-                startSync();
-            } else {
+            if (user) startSync();
+            else {
                 if (unsubConfig) unsubConfig();
                 if (unsubResponses) unsubResponses();
                 document.getElementById('mainContent').classList.add('hidden');
@@ -279,7 +295,6 @@
 
         function startSync() {
             if (!currentUser) return;
-
             const configRef = doc(db, 'artifacts', appId, 'public', 'data', 'config', 'dates');
             if (unsubConfig) unsubConfig();
             unsubConfig = onSnapshot(configRef, (docSnap) => {
@@ -288,7 +303,7 @@
                     tempSelectedDates = [...targetDates];
                 }
                 updateUI();
-            }, (error) => console.error("Config Sync Error:", error));
+            });
 
             const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'responses'));
             if (unsubResponses) unsubResponses();
@@ -297,7 +312,7 @@
                 updateUI();
                 document.getElementById('loading').classList.add('hidden');
                 document.getElementById('mainContent').classList.remove('hidden');
-            }, (error) => console.error("Responses Sync Error:", error));
+            });
         }
 
         function updateUI() {
@@ -316,13 +331,12 @@
                 const nameInp = document.getElementById('userName');
                 if (nameInp) nameInp.value = myData.name || "";
                 const badgeEl = document.getElementById('userBadge');
-                const activeNameEl = document.getElementById('activeUserName');
                 if (badgeEl) badgeEl.classList.remove('hidden');
+                const activeNameEl = document.getElementById('activeUserName');
                 if (activeNameEl) activeNameEl.innerText = myData.name;
             }
         }
 
-        // --- Renderers ---
         function renderCalendar() {
             const container = document.getElementById('calendarContainer');
             if (!container) return;
@@ -366,27 +380,19 @@
             const container = document.getElementById('inputGrid');
             if (!container) return;
             container.innerHTML = '';
-            
             const myData = allResponses.find(r => r.id === currentUser?.uid);
             const myAvailability = myData?.availability || {};
-
             targetDates.forEach(date => {
                 const dateData = myAvailability[date] || [];
                 const card = document.createElement('div');
                 card.className = 'bg-white rounded-2xl p-4 border border-slate-100 shadow-sm';
-                
                 const busyHours = [];
                 gcalEvents.forEach(evt => {
                     const start = new Date(evt.start.dateTime || evt.start.date);
                     const end = new Date(evt.end.dateTime || evt.end.date);
                     const evtDate = `${start.getMonth()+1}/${start.getDate()}(${['日','月','火','水','木','金','土'][start.getDay()]})`;
-                    if (evtDate === date) {
-                        for(let h=start.getHours(); h<end.getHours(); h++) {
-                            busyHours.push(h);
-                        }
-                    }
+                    if (evtDate === date) { for(let h=start.getHours(); h<end.getHours(); h++) busyHours.push(h); }
                 });
-
                 card.innerHTML = `
                     <div class="flex items-center justify-between mb-3">
                         <span class="font-black text-slate-800 text-sm">${date}</span>
@@ -405,7 +411,6 @@
             });
         }
 
-        // --- Window Globals ---
         window.saveConfig = async () => {
             if (!currentUser) return;
             tempSelectedDates.sort((a,b) => {
@@ -463,23 +468,15 @@
             container.innerHTML = '';
             targetDates.forEach(date => {
                 const hourCounts = HOURS.map(h => allResponses.filter(r => r.availability?.[date]?.includes(h)).length);
-                container.innerHTML += `
-                    <div class="bg-white rounded-3xl p-5 border border-slate-100">
-                        <div class="font-black text-slate-800 mb-4">${date}</div>
-                        <div class="flex h-12 bg-slate-50 rounded-xl p-1 gap-1">
-                            ${hourCounts.map(count => {
-                                const ratio = respondentCount > 0 ? count / respondentCount : 0;
-                                const color = ratio > 0.7 ? 'bg-indigo-600' : ratio > 0.3 ? 'bg-indigo-400' : ratio > 0 ? 'bg-indigo-200' : 'bg-white';
-                                return `<div class="flex-1 rounded-md ${color}"></div>`;
-                            }).join('')}
-                        </div>
-                    </div>`;
+                container.innerHTML += `<div class="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm"><div class="font-black text-slate-800 mb-4">${date}</div><div class="flex h-12 bg-slate-50 rounded-xl p-1 gap-1">${hourCounts.map(count => {
+                    const ratio = respondentCount > 0 ? count / respondentCount : 0;
+                    const color = ratio > 0.7 ? 'bg-indigo-600' : ratio > 0.3 ? 'bg-indigo-400' : ratio > 0 ? 'bg-indigo-200' : 'bg-white';
+                    return `<div class="flex-1 rounded-md ${color}"></div>`;
+                }).join('')}</div></div>`;
             });
             const facePile = document.getElementById('facePile');
             if (facePile) {
-                facePile.innerHTML = allResponses.slice(0, 8).map(r => `
-                    <div class="w-8 h-8 rounded-full bg-white border-2 border-indigo-600 flex items-center justify-center text-[10px] font-black text-indigo-600 shadow-sm">${r.name ? r.name.substring(0, 1) : '?'}</div>
-                `).join('') + (allResponses.length > 8 ? `<div class="w-8 h-8 rounded-full bg-indigo-400 border-2 border-indigo-600 flex items-center justify-center text-[8px] font-black text-white">+${allResponses.length - 8}</div>` : '');
+                facePile.innerHTML = allResponses.slice(0, 8).map(r => `<div class="w-8 h-8 rounded-full bg-white border-2 border-indigo-600 flex items-center justify-center text-[10px] font-black text-indigo-600 shadow-sm">${r.name ? r.name.substring(0, 1) : '?'}</div>`).join('') + (allResponses.length > 8 ? `<div class="w-8 h-8 rounded-full bg-indigo-400 border-2 border-indigo-600 flex items-center justify-center text-[8px] font-black text-white">+${allResponses.length - 8}</div>` : '');
             }
         };
 
@@ -494,15 +491,15 @@
                 const promises = snapshot.docs.map(d => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'responses', d.id)));
                 await Promise.all(promises);
                 closeModal();
-            } catch (err) { alert("Error: " + err.message); } finally { if (btn) { btn.disabled = false; btn.innerText = "実行する"; } }
+            } catch (err) { console.error(err); } finally { if (btn) { btn.disabled = false; btn.innerText = "実行する"; } }
         };
 
-        // --- Event Listeners for API Load ---
-        window.addEventListener('gapi-script-loaded', initGapi);
-        window.addEventListener('gis-script-loaded', initGis);
-
+        // 初期化実行
         window.addEventListener('load', () => {
             initAuth();
+            // 万が一onloadが先に走っていた場合の予備チェック
+            if (typeof gapi !== 'undefined') window.initGapi();
+            if (typeof google !== 'undefined') window.initGis();
             lucide.createIcons();
         });
     </script>
