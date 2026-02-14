@@ -88,7 +88,7 @@
                 <div class="bg-indigo-50 border border-indigo-100 p-4 rounded-2xl">
                     <h3 class="text-xs font-black text-indigo-600 uppercase mb-2">主催者ガイド</h3>
                     <p class="text-[10px] text-indigo-500 leading-relaxed font-bold">
-                        1. カレンダーから候補日をタップして選択します。<br>
+                        1. カレンダーから候補日（今日以降）を選択します。<br>
                         2. 下の「候補日を確定する」ボタンを押します。<br>
                         3. 「自分の回答」タブで時間が選べるようになります。
                     </p>
@@ -139,7 +139,7 @@
                             <p class="text-[10px] font-bold opacity-70 uppercase tracking-widest">Total Respondents</p>
                             <h2 class="text-3xl font-black"><span id="respondentCount">0</span> <span class="text-sm font-medium">名</span></h2>
                         </div>
-                        <button onclick="confirmReset()" class="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-colors text-white/70 hover:text-white">
+                        <button onclick="confirmReset()" class="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-colors text-white/70 hover:text-white" title="データをリセット">
                             <i data-lucide="trash-2" class="w-5 h-5"></i>
                         </button>
                     </div>
@@ -155,12 +155,13 @@
                 <div class="w-16 h-16 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
                     <i data-lucide="alert-triangle" class="w-8 h-8"></i>
                 </div>
-                <h3 class="text-center font-black text-slate-900 text-xl mb-2">回答をすべて削除</h3>
+                <h3 class="text-center font-black text-slate-900 text-xl mb-2">リセットの選択</h3>
                 <p class="text-center text-slate-500 text-xs leading-relaxed mb-8">
-                    現在集まっている回答データが消去されます。
+                    どのようなリセットを行いますか？<br>この操作は取り消せません。
                 </p>
                 <div class="space-y-3">
-                    <button onclick="resetAllData()" id="resetSubmitBtn" class="w-full bg-red-500 text-white py-4 rounded-2xl font-black">実行する</button>
+                    <button onclick="resetAllData(true)" id="resetFullBtn" class="w-full bg-red-600 text-white py-4 rounded-2xl font-black shadow-lg shadow-red-200 active:scale-95 transition-transform">すべてリセット<br><span class="text-[9px] opacity-70">(候補日も回答も全消去)</span></button>
+                    <button onclick="resetAllData(false)" id="resetResponsesBtn" class="w-full bg-red-400 text-white py-4 rounded-2xl font-black shadow-lg shadow-red-100 active:scale-95 transition-transform">回答のみ削除<br><span class="text-[9px] opacity-70">(日付は残す)</span></button>
                     <button onclick="closeModal()" class="w-full bg-slate-100 text-slate-600 py-4 rounded-2xl font-black">キャンセル</button>
                 </div>
             </div>
@@ -315,6 +316,9 @@
                 if (docSnap.exists()) {
                     targetDates = docSnap.data().list || [];
                     tempSelectedDates = [...targetDates];
+                } else {
+                    targetDates = [];
+                    tempSelectedDates = [];
                 }
                 updateUI();
             });
@@ -356,6 +360,8 @@
             if (!container) return;
             container.innerHTML = '';
             const now = new Date();
+            const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
             for(let i=0; i<2; i++) {
                 const monthDate = new Date(now.getFullYear(), now.getMonth() + i, 1);
                 const grid = document.createElement('div');
@@ -371,16 +377,24 @@
                 for(let d=1; d<=lastDay; d++) {
                     const current = new Date(monthDate.getFullYear(), monthDate.getMonth(), d);
                     const dateStr = `${current.getMonth()+1}/${current.getDate()}(${['日','月','火','水','木','金','土'][current.getDay()]})`;
+                    
+                    const isPast = current < todayStart;
                     const isSelected = tempSelectedDates.includes(dateStr);
+                    
                     const dayEl = document.createElement('button');
-                    dayEl.className = `h-10 text-xs font-black rounded-lg transition-all ${isSelected ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`;
+                    if (isPast) {
+                        dayEl.className = `h-10 text-xs font-black rounded-lg transition-all bg-slate-50 text-slate-200 cursor-not-allowed opacity-40`;
+                        dayEl.disabled = true;
+                    } else {
+                        dayEl.className = `h-10 text-xs font-black rounded-lg transition-all ${isSelected ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-50 text-slate-600 hover:bg-indigo-50'}`;
+                        dayEl.onclick = () => {
+                            const idx = tempSelectedDates.indexOf(dateStr);
+                            if (idx > -1) tempSelectedDates.splice(idx, 1);
+                            else tempSelectedDates.push(dateStr);
+                            renderCalendar();
+                        };
+                    }
                     dayEl.innerText = d;
-                    dayEl.onclick = () => {
-                        const idx = tempSelectedDates.indexOf(dateStr);
-                        if (idx > -1) tempSelectedDates.splice(idx, 1);
-                        else tempSelectedDates.push(dateStr);
-                        renderCalendar();
-                    };
                     daysGrid.appendChild(dayEl);
                 }
                 grid.appendChild(daysGrid);
@@ -414,25 +428,18 @@
                         <span class="font-black text-slate-800 text-sm">${date}</span>
                         <button onclick="clearDate('${date}')" class="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Clear</button>
                     </div>
-                    
-                    <!-- 時間の目盛り -->
                     <div class="flex w-full px-0.5 mb-1 gap-0.5">
                         ${HOURS.map(h => `<div class="flex-1 text-center text-[8px] font-black text-slate-300 leading-none">${h}</div>`).join('')}
                     </div>
-
                     <div class="flex h-10 w-full bg-slate-50 rounded-lg overflow-hidden border border-slate-100 p-1 gap-0.5">
                         ${HOURS.map(h => {
                             const isActive = dateData.includes(h);
                             const isBusy = busyHours.includes(h);
-                            
                             const clickAttr = isBusy ? '' : `onclick="toggleTime('${date}', ${h})"`;
-                            const busyClass = isBusy ? 'is-busy-slot' : 'hover:bg-slate-100 cursor-pointer';
+                            const busyClass = isBusy ? 'is-busy-slot' : 'hover:bg-indigo-50 cursor-pointer';
                             const activeClass = isActive ? 'bg-indigo-600 shadow-sm' : 'bg-white';
                             const tooltip = isBusy ? 'title="Googleカレンダーに予定があります"' : `title="${h}:00"`;
-                            
-                            return `<div ${clickAttr} ${tooltip}
-                                class="flex-1 rounded-sm time-segment ${activeClass} ${busyClass}">
-                            </div>`;
+                            return `<div ${clickAttr} ${tooltip} class="flex-1 rounded-sm time-segment ${activeClass} ${busyClass}"></div>`;
                         }).join('')}
                     </div>`;
                 container.appendChild(card);
@@ -499,12 +506,9 @@
                 container.innerHTML += `
                     <div class="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm">
                         <div class="font-black text-slate-800 mb-2">${date}</div>
-                        
-                        <!-- 時間の目盛り -->
                         <div class="flex w-full px-1 mb-1 gap-1">
                             ${HOURS.map(h => `<div class="flex-1 text-center text-[8px] font-black text-slate-300 leading-none">${h}</div>`).join('')}
                         </div>
-
                         <div class="flex h-12 bg-slate-50 rounded-xl p-1 gap-1">
                             ${hourCounts.map((count, i) => {
                                 const ratio = respondentCount > 0 ? count / respondentCount : 0;
@@ -522,16 +526,37 @@
 
         window.confirmReset = () => document.getElementById('confirmModal').classList.remove('hidden');
         window.closeModal = () => document.getElementById('confirmModal').classList.add('hidden');
-        window.resetAllData = async () => {
+        
+        window.resetAllData = async (isFullReset) => {
             if (!currentUser) return;
-            const btn = document.getElementById('resetSubmitBtn');
-            if (btn) { btn.disabled = true; btn.innerText = "実行中..."; }
+            const fullBtn = document.getElementById('resetFullBtn');
+            const respBtn = document.getElementById('resetResponsesBtn');
+            fullBtn.disabled = true;
+            respBtn.disabled = true;
+            
             try {
+                // 回答データの削除
                 const snapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'responses'));
                 const promises = snapshot.docs.map(d => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'responses', d.id)));
                 await Promise.all(promises);
+
+                // フルリセットの場合は候補日設定も削除
+                if (isFullReset) {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'dates'));
+                    targetDates = [];
+                    tempSelectedDates = [];
+                }
+
                 closeModal();
-            } catch (err) { console.error(err); } finally { if (btn) { btn.disabled = false; btn.innerText = "実行する"; } }
+                alert(isFullReset ? "すべてのデータをリセットしました。" : "回答データを削除しました。");
+                if (isFullReset) switchTab('config');
+            } catch (err) { 
+                console.error(err); 
+                alert("エラーが発生しました: " + err.message);
+            } finally { 
+                fullBtn.disabled = false;
+                respBtn.disabled = false;
+            }
         };
 
         window.addEventListener('load', () => {
